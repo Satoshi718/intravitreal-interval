@@ -21,6 +21,8 @@ button:active{transform:scale(.98)}button.selected,button.primary{background:#14
 .adjust{display:grid;grid-template-columns:1fr auto 1fr;gap:9px;align-items:center;margin-top:12px}
 .count{text-align:center;font-size:27px;font-weight:800;color:#145b78}.unit{text-align:center;font-size:12px;color:#667780}
 .result{background:#eaf4f8;border-radius:13px;padding:15px;margin-top:14px}
+.elapsed{background:#f0f6f8;border:1px solid #dce9ee;border-radius:12px;padding:12px 14px;margin-top:12px}
+.elapsed-value{font-size:22px;font-weight:800;color:#145b78;margin-top:3px}
 .date{font-size:26px;font-weight:800;color:#104d68}.weekday{font-size:15px;color:#365b6b;margin-top:3px}
 .small{font-size:12px;color:#63737b;line-height:1.65}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
 .status{font-size:12px;color:#55717e;margin-top:12px;text-align:center}
@@ -33,6 +35,10 @@ button:active{transform:scale(.98)}button.selected,button.primary{background:#14
 <input id="lastDate" type="date">
 <label for="visitDate">今回診察日</label>
 <input id="visitDate" type="date">
+<div class="elapsed" aria-live="polite">
+<div class="small">前回注射日からの経過</div>
+<div class="elapsed-value" id="elapsedValue">前回注射日を入力してください</div>
+</div>
 <label>次回注射日の計算基準</label>
 <div class="segment">
 <button id="baseLast" class="selected" type="button">前回注射日から</button>
@@ -68,9 +74,19 @@ const choices=[4,6,8,10,12,14,16,18,20];
 function parseDate(s){if(!s)return null;const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12)}
 function addWeeks(d,n){const x=new Date(d);x.setDate(x.getDate()+n*7);return x}
 function format(d){return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`}
+function elapsedText(){
+ const last=$('lastDate').value, visit=$('visitDate').value;
+ if(!last||!visit)return '前回注射日と今回診察日を入力してください';
+ const [ly,lm,ld]=last.split('-').map(Number), [vy,vm,vd]=visit.split('-').map(Number);
+ const days=Math.round((Date.UTC(vy,vm-1,vd)-Date.UTC(ly,lm-1,ld))/86400000);
+ if(days<0)return '日付を確認してください（診察日が前回注射日より前です）';
+ const w=Math.floor(days/7), d=days%7;
+ return d===0?`${w}週`:`${w}週${d}日`;
+}
 function dayName(d){return ['日','月','火','水','木','金','土'][d.getDay()]+'曜日'}
 function render(){
  $('weekCount').textContent=weeks;
+ $('elapsedValue').textContent=elapsedText();
  document.querySelectorAll('[data-week]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.week)===weeks));
  $('baseLast').classList.toggle('selected',basis==='last');
  $('baseVisit').classList.toggle('selected',basis==='visit');
@@ -92,7 +108,8 @@ $('copy').onclick=async()=>{
  const base=parseDate(basis==='last'?$('lastDate').value:$('visitDate').value);
  if(!base){$('status').textContent=basis==='last'?'前回注射日を入力してください':'今回診察日を入力してください';return}
  const next=addWeeks(base,weeks);
- const text=`計算基準：${basis==='last'?'前回注射日':'今回診察日'}\n投与間隔：${weeks}週\n次回注射予定日：${format(next)}（${dayName(next)}）`;
+ const elapsed=elapsedText();
+ const text=`前回注射日からの経過：${elapsed}\n計算基準：${basis==='last'?'前回注射日':'今回診察日'}\n投与間隔：${weeks}週\n次回注射予定日：${format(next)}（${dayName(next)}）`;
  try{await navigator.clipboard.writeText(text);$('status').textContent='計算結果をコピーしました'}
  catch(e){$('status').textContent='コピーできませんでした。日付を手動でご確認ください。'}
 };
