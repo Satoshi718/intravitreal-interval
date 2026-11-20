@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#145b78">
+<meta name="description" content="硝子体注射の次回予定日を計算するオフライン対応アプリ">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>硝子体注射 間隔計算</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;color:#17252d;background:#f3f6f8}
+*{box-sizing:border-box}body{margin:0;padding:16px 14px 32px;max-width:560px;margin-inline:auto}
+header{padding:8px 4px 14px}h1{font-size:22px;margin:0 0 5px}.sub{color:#60717a;font-size:13px}
+.panel{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #16384a0c}
+label{display:block;font-weight:650;font-size:14px;margin:12px 0 6px}
+input,button{font:inherit}input[type=date]{width:100%;padding:12px;border:1px solid #cbd5db;border-radius:10px;background:#fff;font-size:16px}
+button{border:0;border-radius:10px;padding:12px;background:#e8f0f4;color:#16465a;font-weight:700;cursor:pointer}
+button:active{transform:scale(.98)}button.selected,button.primary{background:#145b78;color:white}
+.weeks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.segment{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.adjust{display:grid;grid-template-columns:1fr auto 1fr;gap:9px;align-items:center;margin-top:12px}
+.count{text-align:center;font-size:27px;font-weight:800;color:#145b78}.unit{text-align:center;font-size:12px;color:#667780}
+.result{background:#eaf4f8;border-radius:13px;padding:15px;margin-top:14px}
+.date{font-size:26px;font-weight:800;color:#104d68}.weekday{font-size:15px;color:#365b6b;margin-top:3px}
+.small{font-size:12px;color:#63737b;line-height:1.65}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.status{font-size:12px;color:#55717e;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+<header><h1>硝子体注射 間隔計算</h1><div class="sub">投与間隔から次回注射予定日を計算</div></header>
+<section class="panel">
+<label for="lastDate">前回注射日</label>
+<input id="lastDate" type="date">
+<label for="visitDate">今回診察日</label>
+<input id="visitDate" type="date">
+<label>次回注射日の計算基準</label>
+<div class="segment">
+<button id="baseLast" class="selected" type="button">前回注射日から</button>
+<button id="baseVisit" type="button">今回診察日から</button>
+</div>
+<label>投与間隔</label>
+<div class="weeks" id="weekButtons"></div>
+<div class="adjust">
+<button id="minus" type="button">− 2週</button>
+<div><div class="count" id="weekCount">8</div><div class="unit">週間</div></div>
+<button id="plus" type="button">＋ 2週</button>
+</div>
+<div class="result" aria-live="polite">
+<div class="small" id="basisLabel">前回注射日を基準に計算</div>
+<div class="date" id="nextDate">日付を入力してください</div>
+<div class="weekday" id="nextWeekday"></div>
+</div>
+<div class="actions">
+<button class="primary" id="copy" type="button">結果をコピー</button>
+<button id="reset" type="button">リセット</button>
+</div>
+<div class="status" id="status">初回設定後はオフラインで利用できます。</div>
+</section>
+<section class="panel small">
+<strong>使用上の注意</strong><br>
+本アプリは日付計算用です。実際の投与間隔・次回投与日は、薬剤の電子添文、適応疾患、病勢、検査所見および医師の判断に基づいて決定してください。入力内容は保存されず、患者情報を端末に保持しません。
+</section>
+<script>
+const $=id=>document.getElementById(id);
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+let weeks=8, basis='last';
+const choices=[4,6,8,10,12,14,16,18,20];
+function parseDate(s){if(!s)return null;const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12)}
+function addWeeks(d,n){const x=new Date(d);x.setDate(x.getDate()+n*7);return x}
+function format(d){return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`}
+function dayName(d){return ['日','月','火','水','木','金','土'][d.getDay()]+'曜日'}
+function render(){
+ $('weekCount').textContent=weeks;
+ document.querySelectorAll('[data-week]').forEach(b=>b.classList.toggle('selected',Number(b.dataset.week)===weeks));
+ $('baseLast').classList.toggle('selected',basis==='last');
+ $('baseVisit').classList.toggle('selected',basis==='visit');
+ $('basisLabel').textContent=basis==='last'?'前回注射日を基準に計算':'今回診察日を基準に計算';
+ const base=parseDate(basis==='last'?$('lastDate').value:$('visitDate').value);
+ if(!base){$('nextDate').textContent=basis==='last'?'前回注射日を入力してください':'今回診察日を入力してください';$('nextWeekday').textContent='';return}
+ const next=addWeeks(base,weeks);
+ $('nextDate').textContent=format(next);$('nextWeekday').textContent=dayName(next);
+}
+choices.forEach(w=>{const b=document.createElement('button');b.type='button';b.textContent=w+'週';b.dataset.week=w;b.onclick=()=>{weeks=w;render()};$('weekButtons').appendChild(b)});
+$('minus').onclick=()=>{weeks=Math.max(4,weeks-2);render()};
+$('plus').onclick=()=>{weeks=Math.min(20,weeks+2);render()};
+$('baseLast').onclick=()=>{basis='last';render()};
+$('baseVisit').onclick=()=>{basis='visit';render()};
+$('visitDate').value=today();
+['lastDate','visitDate'].forEach(id=>$(id).addEventListener('change',render));
+$('reset').onclick=()=>{$('lastDate').value='';$('visitDate').value=today();weeks=8;basis='last';render();$('status').textContent='入力をリセットしました'};
+$('copy').onclick=async()=>{
+ const base=parseDate(basis==='last'?$('lastDate').value:$('visitDate').value);
+ if(!base){$('status').textContent=basis==='last'?'前回注射日を入力してください':'今回診察日を入力してください';return}
+ const next=addWeeks(base,weeks);
+ const text=`計算基準：${basis==='last'?'前回注射日':'今回診察日'}\n投与間隔：${weeks}週\n次回注射予定日：${format(next)}（${dayName(next)}）`;
+ try{await navigator.clipboard.writeText(text);$('status').textContent='計算結果をコピーしました'}
+ catch(e){$('status').textContent='コピーできませんでした。日付を手動でご確認ください。'}
+};
+if('serviceWorker' in navigator && location.protocol==='https:'){
+ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js')
+ .then(()=>$('status').textContent='アプリの準備ができました。初回読み込み後はオフラインで起動できます。')
+ .catch(()=>$('status').textContent='オフライン設定に失敗しました。ページを再読み込みしてください。'));
+}
+render();
+</script>
+</body></html>
